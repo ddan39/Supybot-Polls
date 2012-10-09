@@ -46,9 +46,9 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         cursor = db.cursor()
         cursor.execute("""CREATE TABLE polls(
                     id INTEGER PRIMARY KEY,
-                    started_time TIMESTAMP,         # time when poll was created
-                    isAnnouncing INTEGER default 1, # if poll is announcing to channel
-                    closed TIMESTAMP,               # NULL by default, set to time when closed(no more voting allowed)
+                    started_time TIMESTAMP,         -- time when poll was created
+                    isAnnouncing INTEGER default 1, -- if poll is announcing to channel
+                    closed TIMESTAMP,               -- NULL by default, set to time when closed(no more voting allowed)
                     question TEXT)""")
         cursor.execute("""CREATE TABLE choices(
                     poll_id INTEGER,

@@ -46,9 +46,9 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         cursor = db.cursor()
         cursor.execute("""CREATE TABLE polls(
                     id INTEGER PRIMARY KEY,
-                    started_time TIMESTAMP,     # time when poll was created
-                    isActive INTEGER default 1, # if poll is active(allows new votes)
-                    closed TIMESTAMP,           # NULL by default, set to time when closed
+                    started_time TIMESTAMP,         # time when poll was created
+                    isAnnouncing INTEGER default 1, # if poll is announcing to channel
+                    closed TIMESTAMP,               # NULL by default, set to time when closed(no more voting allowed)
                     question TEXT)""")
         cursor.execute("""CREATE TABLE choices(
                     poll_id INTEGER,
@@ -69,10 +69,11 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
 
         db = self.getDb(channel)
         cursor = db.cursor()
-        cursor.execute('SELECT isActive,closed,question FROM polls WHERE id=?', (pollid,))
-        is_active, closed, question = cursor.fetchone()
+        cursor.execute('SELECT isAnnouncing,closed,question FROM polls WHERE id=?', (pollid,))
+        is_announcing, closed, question = cursor.fetchone()
 
-        if (not is_active) or closed:
+        # if poll shouldnt be announcing or is closed, then stop schedule
+        if (not is_announcing) or closed:
             try:
                 schedule.removeEvent('%s_poll_%s' % (channel, pollid))
                 self.poll_schedules.remove('%s_poll_%s' % (channel, pollid))
@@ -244,7 +245,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         cursor = db.cursor()
 
         # query to check poll exists, and if it is already on
-        cursor.execute('SELECT isActive,closed FROM polls WHERE id=?', (pollid,))
+        cursor.execute('SELECT isAnnouncing,closed FROM polls WHERE id=?', (pollid,))
         result = cursor.fetchone()
         if result is None:
             irc.error('That poll id does not exist')
@@ -254,7 +255,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
             return
         
         # query to set poll off
-        db.execute('UPDATE polls SET isActive=? WHERE id=?', (1, pollid))
+        db.execute('UPDATE polls SET isAnnouncing=? WHERE id=?', (1, pollid))
         db.commit()
 
         if result[1] is not None:
@@ -281,7 +282,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         cursor = db.cursor()
 
         # query to grab poll info, then check it exists, isnt already off, and warn them if it is closed
-        cursor.execute('SELECT isActive,closed FROM polls WHERE id=?', (pollid,))
+        cursor.execute('SELECT isAnnouncing,closed FROM polls WHERE id=?', (pollid,))
         result = cursor.fetchone()
         if result is None:
             irc.error('That poll id does not exist')
@@ -293,7 +294,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
             irc.reply('Note: you are turning off a closed poll')
 
         # iquery to turn the poll "off", meaning it wont be scheduled to announce
-        cursor.execute('UPDATE polls SET isActive=? WHERE id=?', (0, pollid))
+        cursor.execute('UPDATE polls SET isAnnouncing=? WHERE id=?', (0, pollid))
         db.commit()
 
         try:
@@ -314,7 +315,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         cursor = db.cursor()
 
         # query to check poll exists and if it is closed
-        cursor.execute('SELECT isActive,closed FROM polls WHERE id=?', (pollid,))
+        cursor.execute('SELECT isAnnouncing,closed FROM polls WHERE id=?', (pollid,))
         result = cursor.fetchone()
         if result is None:
             irc.error('Poll id doesnt exist')
@@ -345,7 +346,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         cursor = db.cursor()
 
         # query to check poll exists and if it is open
-        cursor.execute('SELECT isActive,closed FROM polls WHERE id=?', (pollid,))
+        cursor.execute('SELECT isAnnouncing,closed FROM polls WHERE id=?', (pollid,))
         result = cursor.fetchone()
         if result is None:
             irc.error('Poll id doesnt exist')

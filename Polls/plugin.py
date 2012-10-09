@@ -63,7 +63,20 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
                     time timestamp)""")
         db.commit()
         return db
-
+    
+    def executeQuery(self, channel, queryString):
+        """ Executes a SqLite query
+            in the given Db """
+        try:
+            db = self.getDb(channel)
+            cursor = db.cursor()
+            cursor.execute(queryString)
+        except Exception, e:
+            cursor = None
+            self.log.error('Error with sqlite execute: %s' % e)
+            self.log.error('For QueryString: %s' % queryString)
+        return cursor    
+        
     def _runPoll(self, irc, channel, pollid):
         """Run by supybot schedule, outputs poll question and choices into channel at set interval"""
 

@@ -44,45 +44,49 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         db = sqlite3.connect(filename, detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES)
         db.text_factory = str
         cursor = db.cursor()
-        cursor.execute("""CREATE TABLE polls(
+
+        self.executeQuery(cursor, """CREATE TABLE polls(
                     id INTEGER PRIMARY KEY,
                     started_time TIMESTAMP,         -- time when poll was created
                     isAnnouncing INTEGER default 1, -- if poll is announcing to channel
                     closed TIMESTAMP,               -- NULL by default, set to time when closed(no more voting allowed)
-                    question TEXT)""")
-        cursor.execute("""CREATE TABLE choices(
+                    question TEXT)""", None)
+        self.executeQuery(cursor, """CREATE TABLE choices(
                     poll_id INTEGER,
                     choice_num INTEGER,
-                    choice TEXT)""")
-        cursor.execute("""CREATE TABLE votes(
+                    choice TEXT)""", None)
+        self.executeQuery(cursor, """CREATE TABLE votes(
                     id INTEGER PRIMARY KEY,
                     poll_id INTEGER,
                     voter_nick TEXT,
                     voter_host TEXT,
                     choice INTEGER,
-                    time timestamp)""")
+                    time timestamp)""", None)
         db.commit()
         return db
-    
-    def executeQuery(self, channel, queryString):
+
+    def executeQuery(self, cursor, queryString, sqlargs):
         """ Executes a SqLite query
             in the given Db """
+       # print("Inside ExecuteQuery")
         try:
-            db = self.getDb(channel)
-            cursor = db.cursor()
-            cursor.execute(queryString)
+            if sqlargs is None:
+                cursor.execute(queryString)
+            else:
+                cursor.execute(queryString,sqlargs)
         except Exception, e:
             cursor = None
             self.log.error('Error with sqlite execute: %s' % e)
             self.log.error('For QueryString: %s' % queryString)
+            print("error ExecuteQuery")
         return cursor    
-        
+
     def _runPoll(self, irc, channel, pollid):
         """Run by supybot schedule, outputs poll question and choices into channel at set interval"""
 
         db = self.getDb(channel)
         cursor = db.cursor()
-        cursor.execute('SELECT isAnnouncing,closed,question FROM polls WHERE id=?', (pollid,))
+        self.executeQuery(cursor, 'SELECT isAnnouncing,closed,question FROM polls WHERE id=?', (pollid,))
         is_announcing, closed, question = cursor.fetchone()
 
         # if poll shouldnt be announcing or is closed, then stop schedule
@@ -96,7 +100,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
 
         irc.sendMsg(ircmsgs.privmsg(channel, 'Poll #%s: %s' % (pollid, question)))
 
-        cursor.execute('SELECT choice_num,choice FROM choices WHERE poll_id=? ORDER BY choice_num', (pollid,))
+        self.executeQuery(cursor, 'SELECT choice_num,choice FROM choices WHERE poll_id=? ORDER BY choice_num', (pollid,))
 
         # output all of the polls choices
         choice_row = cursor.fetchone()
@@ -118,7 +122,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
 
         db = self.getDb(channel)
         cursor = db.cursor()
-        cursor.execute('INSERT INTO polls VALUES (?,?,?,?,?)', (None, datetime.datetime.now(), 1, None, question))
+        self.executeQuery(cursor, 'INSERT INTO polls VALUES (?,?,?,?,?)', (None, datetime.datetime.now(), 1, None, question))
         pollid = cursor.lastrowid
 
         # used to add choices into db
@@ -152,7 +156,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         cursor = db.cursor()
 
         # query to check that poll exists and it isnt closed
-        cursor.execute('SELECT closed FROM polls WHERE id=?', (pollid,))
+        self.executeQuery(cursor, 'SELECT closed FROM polls WHERE id=?', (pollid,))
         result = cursor.fetchone()
         if result is None:
             irc.error('No poll with that id')
@@ -162,21 +166,21 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
             return
 
         # query to check that their choice exists
-        cursor.execute('SELECT * FROM choices WHERE poll_id=? AND choice_num=?', (pollid, choice))
+        self.executeQuery(cursor, 'SELECT * FROM choices WHERE poll_id=? AND choice_num=?', (pollid, choice))
         result = cursor.fetchone()
         if result is None:
             irc.error('That is not a choice for that poll')
             return
         
         # query to check they havnt already voted on this poll
-        cursor.execute('SELECT choice,time FROM votes WHERE (voter_nick=? OR voter_host=?) AND poll_id=?', (msg.nick, msg.host, pollid))
+        self.executeQuery(cursor, 'SELECT choice,time FROM votes WHERE (voter_nick=? OR voter_host=?) AND poll_id=?', (msg.nick, msg.host, pollid))
         result = cursor.fetchone()
         if result is not None:
             irc.error('You have already voted for %s on %s' % (result[0], result[1].strftime('%Y-%m-%d at %-I:%M %p')))
             return
 
         # query to insert their vote
-        cursor.execute('INSERT INTO votes VALUES (?,?,?,?,?,?)', (None, pollid, msg.nick, msg.host, choice, datetime.datetime.now()))
+        self.executeQuery(cursor, 'INSERT INTO votes VALUES (?,?,?,?,?,?)', (None, pollid, msg.nick, msg.host, choice, datetime.datetime.now()))
         db.commit()
 
         irc.sendMsg(ircmsgs.privmsg(channel, 'Your vote on poll #%s for %s has been inputed, sending you results in PM' % (pollid, choice)))
@@ -185,10 +189,10 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
 
         # query loop thru each choice for this poll, and for each choice another query to grab number of votes, and output
         cursor2 = db.cursor()
-        cursor.execute('SELECT choice_num,choice FROM choices WHERE poll_id=? ORDER BY choice_num', (pollid,))
+        self.executeQuery(cursor, 'SELECT choice_num,choice FROM choices WHERE poll_id=? ORDER BY choice_num', (pollid,))
         choice_row = cursor.fetchone()
         while choice_row is not None:
-            cursor2.execute('SELECT count(*) FROM votes WHERE poll_id=? AND choice=?', (pollid, choice_row[0],))
+            self.executeQuery(cursor2, 'SELECT count(*) FROM votes WHERE poll_id=? AND choice=?', (pollid, choice_row[0],))
             vote_row = cursor2.fetchone()
             irc.sendMsg(ircmsgs.privmsg(msg.nick, '%s: %s - %s votes' % (choice_row[0], choice_row[1], vote_row[0])))
             choice_row = cursor.fetchone()
@@ -204,14 +208,14 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
 
         # query to make sure this poll exists. make new cursor since we will use it further below to output results
         cursor1 = db.cursor()
-        cursor1.execute('SELECT choice_num,choice FROM choices WHERE poll_id=? ORDER BY choice_num', (pollid,))
+        self.executeQuery(cursor, 'SELECT choice_num,choice FROM choices WHERE poll_id=? ORDER BY choice_num', (pollid,))
         choice_row = cursor1.fetchone()
         if choice_row is None:
             irc.error('I dont think that poll id exists')
             return
 
         # query to make sure they have already voted on this poll
-        cursor.execute('SELECT id FROM votes WHERE poll_id=? AND (voter_nick=? OR voter_host=?)', (pollid, msg.nick, msg.host))
+        self.executeQuery(cursor, 'SELECT id FROM votes WHERE poll_id=? AND (voter_nick=? OR voter_host=?)', (pollid, msg.nick, msg.host))
         result = cursor.fetchone()
         if result is None:
             irc.error('You need to vote first to view results!')
@@ -222,7 +226,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         # query loop thru each choice for this poll, and for each choice another query to grab number of votes, and output
         cursor2 = db.cursor()
         while choice_row is not None: 
-            cursor2.execute('SELECT count(*) FROM votes WHERE poll_id=? AND choice=?', (pollid, choice_row[0],))
+            self.executeQuery(cursor2, 'SELECT count(*) FROM votes WHERE poll_id=? AND choice=?', (pollid, choice_row[0],))
             vote_row = cursor2.fetchone()
             irc.sendMsg(ircmsgs.privmsg(msg.nick, '%s: %s - %s votes' % (choice_row[0], choice_row[1], vote_row[0])))
             choice_row = cursor1.fetchone()
@@ -239,13 +243,13 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         db = self.getDb(channel)
         cursor = db.cursor()
 
-        cursor.execute('SELECT id,question FROM polls WHERE closed=NULL')
+        self.executeQuery(cursor, 'SELECT id,question FROM polls WHERE closed=NULL', None)
         row = cursor.fetchone()
 
         # query loop over polls and output info
         cursor2 = db.cursor()
         while row is not None:
-            cursor2.execute('SELECT choice_num,choice FROM choices WHERE poll_id=? ORDER BY choice_num', (row[0],))
+            self.executeQuery(cursor2, 'SELECT choice_num,choice FROM choices WHERE poll_id=? ORDER BY choice_num', (row[0],))
             row = cursor.fetchone()
 
     openpolls = wrap(openpolls, ['channeldb'])
@@ -258,7 +262,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         cursor = db.cursor()
 
         # query to check poll exists, and if it is already on
-        cursor.execute('SELECT isAnnouncing,closed FROM polls WHERE id=?', (pollid,))
+        self.executeQuery(cursor, 'SELECT isAnnouncing,closed FROM polls WHERE id=?', (pollid,))
         result = cursor.fetchone()
         if result is None:
             irc.error('That poll id does not exist')
@@ -295,7 +299,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         cursor = db.cursor()
 
         # query to grab poll info, then check it exists, isnt already off, and warn them if it is closed
-        cursor.execute('SELECT isAnnouncing,closed FROM polls WHERE id=?', (pollid,))
+        self.executeQuery(cursor, 'SELECT isAnnouncing,closed FROM polls WHERE id=?', (pollid,))
         result = cursor.fetchone()
         if result is None:
             irc.error('That poll id does not exist')
@@ -307,7 +311,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
             irc.reply('Note: you are turning off a closed poll')
 
         # iquery to turn the poll "off", meaning it wont be scheduled to announce
-        cursor.execute('UPDATE polls SET isAnnouncing=? WHERE id=?', (0, pollid))
+        self.executeQuery(cursor, 'UPDATE polls SET isAnnouncing=? WHERE id=?', (0, pollid))
         db.commit()
 
         try:
@@ -328,7 +332,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         cursor = db.cursor()
 
         # query to check poll exists and if it is closed
-        cursor.execute('SELECT isAnnouncing,closed FROM polls WHERE id=?', (pollid,))
+        self.executeQuery(cursor, 'SELECT isAnnouncing,closed FROM polls WHERE id=?', (pollid,))
         result = cursor.fetchone()
         if result is None:
             irc.error('Poll id doesnt exist')
@@ -338,7 +342,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
             return
 
         # close the poll in db
-        cursor.execute('UPDATE polls SET closed=? WHERE id=?', (datetime.datetime.now(), pollid))
+        self.executeQuery(cursor, 'UPDATE polls SET closed=? WHERE id=?', (datetime.datetime.now(), pollid))
         db.commit()
 
         try:
@@ -359,7 +363,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         cursor = db.cursor()
 
         # query to check poll exists and if it is open
-        cursor.execute('SELECT isAnnouncing,closed FROM polls WHERE id=?', (pollid,))
+        self.executeQuery(cursor, 'SELECT isAnnouncing,closed FROM polls WHERE id=?', (pollid,))
         result = cursor.fetchone()
         if result is None:
             irc.error('Poll id doesnt exist')
@@ -369,7 +373,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
             return
 
         # query to OPEN IT UP! unsets closed time
-        cursor.execute('UPDATE polls SET closed=? WHERE id=?', (None, pollid))
+        self.executeQuery(cursor, 'UPDATE polls SET closed=? WHERE id=?', (None, pollid))
         db.commit()
 
         # if poll was set active then start schedule for it

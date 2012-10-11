@@ -105,7 +105,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         # output all of the polls choices
         choice_row = cursor.fetchone()
         while choice_row is not None:
-            irc.reply(('%s: %s' % (choice_row[0], choice_row[1])), prefixNick=False)
+            irc.reply('%s: %s' % (choice_row[0], choice_row[1]), prefixNick=False)
             choice_row = cursor.fetchone()
         
         irc.reply('To vote, do !vote %s <choice number>' % pollid, prefixNick=False) 

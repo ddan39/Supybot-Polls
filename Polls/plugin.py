@@ -50,34 +50,34 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
                     started_time TIMESTAMP,         -- time when poll was created
                     isAnnouncing INTEGER default 1, -- if poll is announcing to channel
                     closed TIMESTAMP,               -- NULL by default, set to time when closed(no more voting allowed)
-                    question TEXT)""", None)
+                    question TEXT)""")
         self.executeQuery(cursor, """CREATE TABLE choices(
                     poll_id INTEGER,
                     choice_num INTEGER,
-                    choice TEXT)""", None)
+                    choice TEXT)""")
         self.executeQuery(cursor, """CREATE TABLE votes(
                     id INTEGER PRIMARY KEY,
                     poll_id INTEGER,
                     voter_nick TEXT,
                     voter_host TEXT,
                     choice INTEGER,
-                    time timestamp)""", None)
+                    time timestamp)""")
         db.commit()
         return db
 
-    def executeQuery(self, cursor, queryString, sqlargs):
+    def executeQuery(self, cursor, queryString, *sqlargs):
         """ Executes a SqLite query
             in the given Db """
       
         try:
-            if sqlargs is None:
+            if sqlargs:
                 cursor.execute(queryString)
             else:
-                cursor.execute(queryString,sqlargs)
+                cursor.execute(queryString, sqlargs)
         except Exception, e:
-            cursor = None
             self.log.error('Error with sqlite execute: %s' % e)
             self.log.error('For QueryString: %s' % queryString)
+            raise Exception()
 
         return cursor    
 
@@ -241,7 +241,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         public command to PM you list of all polls"""
         db = self.getDb(channel)
         cursor = db.cursor()
-        self.executeQuery(cursor, 'SELECT id,question FROM polls WHERE closed is NULL', None)
+        self.executeQuery(cursor, 'SELECT id,question FROM polls WHERE closed is NULL')
         row = cursor.fetchone()
         
         while row is not None:

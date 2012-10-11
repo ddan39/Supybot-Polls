@@ -98,17 +98,17 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
                 self.log.warning('_runPoll Failed to remove schedule event')
             return
 
-        irc.sendMsg(ircmsgs.privmsg(channel, 'Poll #%s: %s' % (pollid, question)))
+        irc.reply('Poll #%s: %s' % (pollid, question), prefixNick=False)
 
         self.executeQuery(cursor, 'SELECT choice_num,choice FROM choices WHERE poll_id=? ORDER BY choice_num', (pollid,))
 
         # output all of the polls choices
         choice_row = cursor.fetchone()
         while choice_row is not None:
-            irc.sendMsg(ircmsgs.privmsg(channel, ('%s: %s' % (choice_row[0], choice_row[1]))))
+            irc.reply(('%s: %s' % (choice_row[0], choice_row[1])), prefixNick=False)
             choice_row = cursor.fetchone()
         
-        irc.sendMsg(ircmsgs.privmsg(channel, 'To vote, do !vote %s <choice number>' % pollid)) 
+        irc.reply('To vote, do !vote %s <choice number>' % pollid, prefixNick=False) 
 
 
     def newpoll(self, irc, msg, args, channel, interval, answers, question):
@@ -183,9 +183,9 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         self.executeQuery(cursor, 'INSERT INTO votes VALUES (?,?,?,?,?,?)', (None, pollid, msg.nick, msg.host, choice, datetime.datetime.now()))
         db.commit()
 
-        irc.sendMsg(ircmsgs.privmsg(channel, 'Your vote on poll #%s for %s has been inputed, sending you results in PM' % (pollid, choice)))
+        irc.reply('Your vote on poll #%s for %s has been inputed, sending you results in PM' % (pollid, choice), prefixNick=False)
 
-        irc.sendMsg(ircmsgs.privmsg(msg.nick, 'Here is results for poll #%s, you just voted for %s' % (pollid, choice)))
+        irc.reply('Here is results for poll #%s, you just voted for %s' % (pollid, choice), prefixNick=False, private=True)
 
         # query loop thru each choice for this poll, and for each choice another query to grab number of votes, and output
         cursor2 = db.cursor()
@@ -194,7 +194,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         while choice_row is not None:
             self.executeQuery(cursor2, 'SELECT count(*) FROM votes WHERE poll_id=? AND choice=?', (pollid, choice_row[0],))
             vote_row = cursor2.fetchone()
-            irc.sendMsg(ircmsgs.privmsg(msg.nick, '%s: %s - %s votes' % (choice_row[0], choice_row[1], vote_row[0])))
+            irc.reply('%s: %s - %s votes' % (choice_row[0], choice_row[1], vote_row[0]), prefixNick=False, private=True)
             choice_row = cursor.fetchone()
 
     vote = wrap(vote, ['channeldb', 'positiveInt', 'positiveInt'])
@@ -221,14 +221,14 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
             irc.error('You need to vote first to view results!')
             return
 
-        irc.sendMsg(ircmsgs.privmsg(msg.nick, 'Here is results for poll #%s' % pollid))
+        irc.reply('Here is results for poll #%s' % pollid, prefixNick=False, private=True)
 
         # query loop thru each choice for this poll, and for each choice another query to grab number of votes, and output
         cursor2 = db.cursor()
         while choice_row is not None: 
             self.executeQuery(cursor2, 'SELECT count(*) FROM votes WHERE poll_id=? AND choice=?', (pollid, choice_row[0],))
             vote_row = cursor2.fetchone()
-            irc.sendMsg(ircmsgs.privmsg(msg.nick, '%s: %s - %s votes' % (choice_row[0], choice_row[1], vote_row[0])))
+            irc.reply('%s: %s - %s votes' % (choice_row[0], choice_row[1], vote_row[0]), prefixNick=False, private=True)
             choice_row = cursor1.fetchone()
 
         irc.replySuccess()
@@ -245,13 +245,13 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         row = cursor.fetchone()
         
         while row is not None:
-            irc.sendMsg(ircmsgs.privmsg(msg.nick, '%s: %s' % (row[0], row[1])))
+            irc.reply('%s: %s' % (row[0], row[1]), prefixNick=False, private=True)
             cursorChoice = db.cursor()
             self.executeQuery(cursorChoice, 'SELECT choice_num,choice FROM choices WHERE poll_id=? ORDER BY choice_num', (row[0],))
             choiceRow = cursorChoice.fetchone()
-            irc.sendMsg(ircmsgs.privmsg(msg.nick, 'The choices are as follows :- '))
+            irc.reply('The choices are as follows :- ', prefixNick=False, private=True)
             while choiceRow is not None:
-                irc.sendMsg(ircmsgs.privmsg(msg.nick, '%s: %s' % (choiceRow[0], choiceRow[1])))
+                irc.reply('%s: %s' % (choiceRow[0], choiceRow[1]), prefixNick=False, private=True)
                 choiceRow = cursorChoice.fetchone()
             row = cursor.fetchone()
 

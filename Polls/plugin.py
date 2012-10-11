@@ -68,7 +68,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
     def executeQuery(self, cursor, queryString, sqlargs):
         """ Executes a SqLite query
             in the given Db """
-       # print("Inside ExecuteQuery")
+      
         try:
             if sqlargs is None:
                 cursor.execute(queryString)
@@ -78,7 +78,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
             cursor = None
             self.log.error('Error with sqlite execute: %s' % e)
             self.log.error('For QueryString: %s' % queryString)
-            print("error ExecuteQuery")
+
         return cursor    
 
     def _runPoll(self, irc, channel, pollid):
@@ -239,17 +239,20 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
     def openpolls(self, irc, msg, args, channel):
         """takes no arguments
         public command to PM you list of all polls"""
-
         db = self.getDb(channel)
         cursor = db.cursor()
-
-        self.executeQuery(cursor, 'SELECT id,question FROM polls WHERE closed=NULL', None)
+        self.executeQuery(cursor, 'SELECT id,question FROM polls WHERE closed is NULL', None)
         row = cursor.fetchone()
-
-        # query loop over polls and output info
-        cursor2 = db.cursor()
+        
         while row is not None:
-            self.executeQuery(cursor2, 'SELECT choice_num,choice FROM choices WHERE poll_id=? ORDER BY choice_num', (row[0],))
+            irc.sendMsg(ircmsgs.privmsg(msg.nick, '%s: %s' % (row[0], row[1])))
+            cursorChoice = db.cursor()
+            self.executeQuery(cursorChoice, 'SELECT choice_num,choice FROM choices WHERE poll_id=? ORDER BY choice_num', (row[0],))
+            choiceRow = cursorChoice.fetchone()
+            irc.sendMsg(ircmsgs.privmsg(msg.nick, 'The choices are as follows :- '))
+            while choiceRow is not None:
+                irc.sendMsg(ircmsgs.privmsg(msg.nick, '%s: %s' % (choiceRow[0], choiceRow[1])))
+                choiceRow = cursorChoice.fetchone()
             row = cursor.fetchone()
 
     openpolls = wrap(openpolls, ['channeldb'])

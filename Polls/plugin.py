@@ -77,7 +77,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         except Exception, e:
             self.log.error('Error with sqlite execute: %s' % e)
             self.log.error('For QueryString: %s' % queryString)
-            raise Exception()
+            raise
 
         return cursor    
 

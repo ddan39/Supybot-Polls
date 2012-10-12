@@ -33,7 +33,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         callbacks.Plugin.__init__(self, irc)
         plugins.ChannelDBHandler.__init__(self)
         self.poll_schedules = [] # stores the current polls that are scheduled, so that on unload we can remove them
-    
+
     def makeDb(self, filename):
         """ If db file exists, do connection and return it, else make new db and return connection to it"""
 
@@ -68,7 +68,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
     def _execute_query(self, cursor, queryString, *sqlargs):
         """ Executes a SqLite query
             in the given Db """
-      
+
         try:
             if sqlargs:
                 cursor.execute(queryString, sqlargs)
@@ -80,21 +80,21 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
             raise
 
         return cursor
-    
+
     def _poll_info(self, db, pollid):
         """ Does SQL query with 'db' for 'pollid' and returns isAnnouncing, closed, question
         or None if pollid doesnt exist
-        
+
         ::isAnnouncing:: Integer 1 or 0
         ::closed:: None or datetime object
         ::question:: string""" 
-        
+
         cursor = db.cursor()
         self._execute_query(cursor, 'SELECT isAnnouncing,closed,question FROM polls WHERE id=?', pollid)
         result = cursor.fetchone()
         if result is None:
             return
-        
+
         return result[0], result[1], result[2]
 
     def _runPoll(self, irc, channel, pollid):
@@ -102,7 +102,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
 
         db = self.getDb(channel)
         cursor = db.cursor()
-        
+
         pollinfo = self._poll_info(db, pollid)
         if pollinfo is None:
             schedule.removeEvent('%s_poll_%s' % (channel, pollid))
@@ -128,9 +128,8 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         while choice_row is not None:
             irc.reply('%s: %s' % (choice_row[0], choice_row[1]), prefixNick=False)
             choice_row = cursor.fetchone()
-        
-        irc.reply('To vote, do !vote %s <choice number>' % pollid, prefixNick=False) 
 
+        irc.reply('To vote, do !vote %s <choice number>' % pollid, prefixNick=False) 
 
     def newpoll(self, irc, msg, args, channel, interval, answers, question):
         """<number of minutes for announce interval> <"answer, answer, ..."> question
@@ -191,7 +190,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         if result is None:
             irc.error('That is not a choice for that poll')
             return
-        
+
         # query to check they havnt already voted on this poll
         self._execute_query(cursor, 'SELECT choice,time FROM votes WHERE (voter_nick=? OR voter_host=?) AND poll_id=?', msg.nick, msg.host, pollid)
         result = cursor.fetchone()
@@ -261,9 +260,9 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         public command to PM you list of all polls"""
         db = self.getDb(channel)
         cursor = db.cursor()
-        
+
         self._execute_query(cursor, 'SELECT id,question FROM polls WHERE closed is NULL')
-        
+
         row = cursor.fetchone()
         while row is not None:
             irc.reply('Poll #%s: %s' % (row[0], row[1]), prefixNick=False, private=True)
@@ -293,7 +292,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         if pollinfo[0] == 1:
             irc.error('Poll is already active')
             return
-        
+
         # query to set poll off
         db.execute('UPDATE polls SET isAnnouncing=? WHERE id=?', (1, pollid))
         db.commit()
@@ -416,6 +415,5 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
             schedule.removeEvent(schedule_name)
 
 Class = Polls
-
 
 # vim:set shiftwidth=4 softtabstop=4 expandtab:

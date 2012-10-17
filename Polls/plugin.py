@@ -53,7 +53,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
                     question TEXT)""")
         self._execute_query(cursor, """CREATE TABLE choices(
                     poll_id INTEGER,
-                    choice_num INTEGER,
+                    choice_char TEXT,
                     choice TEXT)""")
         self._execute_query(cursor, """CREATE TABLE votes(
                     id INTEGER PRIMARY KEY,
@@ -121,7 +121,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
 
         irc.reply('Poll #%s: %s' % (pollid, question), prefixNick=False)
 
-        self._execute_query(cursor, 'SELECT choice_num,choice FROM choices WHERE poll_id=? ORDER BY choice_num', pollid)
+        self._execute_query(cursor, 'SELECT choice_char,choice FROM choices WHERE poll_id=? ORDER BY choice_char', pollid)
 
         # output all of the polls choices
         choice_row = cursor.fetchone()
@@ -145,10 +145,10 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         self._execute_query(cursor, 'INSERT INTO polls VALUES (?,?,?,?,?)', None, datetime.datetime.now(), 1, None, question)
         pollid = cursor.lastrowid
 
-        # used to add choices into db
+        # used to add choices into db. each choice represented by character, starting at capital A (code 65)
         def genAnswers():
-            for i, answer in enumerate(answers, start=1):
-                yield pollid, i, answer
+            for i, answer in enumerate(answers, start=65):
+                yield pollid, chr(i), answer
 
         cursor.executemany('INSERT INTO choices VALUES (?,?,?)', genAnswers())
 
@@ -169,7 +169,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
     newpoll = wrap(newpoll, ['channeldb', 'Op', 'positiveInt', commalist('something'), 'text'])
 
     def vote(self, irc, msg, args, channel, pollid, choice):
-        """<poll id number> <choice number>
+        """<poll id number> <choice letter>
         public command to vote on poll"""
 
         db = self.getDb(channel)
@@ -185,7 +185,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
             return
 
         # query to check that their choice exists
-        self._execute_query(cursor, 'SELECT * FROM choices WHERE poll_id=? AND choice_num=?', pollid, choice)
+        self._execute_query(cursor, 'SELECT * FROM choices WHERE poll_id=? AND choice_char=?', pollid, choice)
         result = cursor.fetchone()
         if result is None:
             irc.error('That is not a choice for that poll')
@@ -208,7 +208,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
 
         # query loop thru each choice for this poll, and for each choice another query to grab number of votes, and output
         cursor2 = db.cursor()
-        self._execute_query(cursor, 'SELECT choice_num,choice FROM choices WHERE poll_id=? ORDER BY choice_num', pollid)
+        self._execute_query(cursor, 'SELECT choice_char,choice FROM choices WHERE poll_id=? ORDER BY choice_char', pollid)
         choice_row = cursor.fetchone()
         while choice_row is not None:
             self._execute_query(cursor2, 'SELECT count(*) FROM votes WHERE poll_id=? AND choice=?', pollid, choice_row[0])
@@ -227,7 +227,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
 
         # query to make sure this poll exists. make new cursor since we will use it further below to output results
         cursor1 = db.cursor()
-        self._execute_query(cursor, 'SELECT choice_num,choice FROM choices WHERE poll_id=? ORDER BY choice_num', pollid)
+        self._execute_query(cursor, 'SELECT choice_char,choice FROM choices WHERE poll_id=? ORDER BY choice_char', pollid)
         choice_row = cursor1.fetchone()
         if choice_row is None:
             irc.error('I dont think that poll id exists')
@@ -268,7 +268,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
             irc.reply('Poll #%s: %s' % (row[0], row[1]), prefixNick=False, private=True)
             irc.reply('The choices are as follows :- ', prefixNick=False, private=True)
             cursorChoice = db.cursor()
-            self._execute_query(cursorChoice, 'SELECT choice_num,choice FROM choices WHERE poll_id=? ORDER BY choice_num', row[0])
+            self._execute_query(cursorChoice, 'SELECT choice_char,choice FROM choices WHERE poll_id=? ORDER BY choice_char', row[0])
             choiceRow = cursorChoice.fetchone()
             while choiceRow is not None:
                 irc.reply('%s: %s' % (choiceRow[0], choiceRow[1]), prefixNick=False, private=True)

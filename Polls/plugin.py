@@ -227,7 +227,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
 
         # query to make sure this poll exists. make new cursor since we will use it further below to output results
         cursor1 = db.cursor()
-        self._execute_query(cursor, 'SELECT choice_char,choice FROM choices WHERE poll_id=? ORDER BY choice_char', pollid)
+        self._execute_query(cursor1, 'SELECT choice_char,choice FROM choices WHERE poll_id=? ORDER BY choice_char', pollid)
         choice_row = cursor1.fetchone()
         if choice_row is None:
             irc.error('I dont think that poll id exists')

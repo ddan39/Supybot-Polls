@@ -216,7 +216,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
             irc.reply('%s: %s - %s votes' % (choice_row[0], choice_row[1], vote_row[0]), prefixNick=False, private=True)
             choice_row = cursor.fetchone()
 
-    vote = wrap(vote, ['channeldb', 'positiveInt', 'positiveInt'])
+    vote = wrap(vote, ['channeldb', 'positiveInt', 'letter'])
 
     def results(self, irc, msg, args, channel, pollid):
         """[channel] <pollid>

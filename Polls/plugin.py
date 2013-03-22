@@ -5,6 +5,7 @@
 #
 ###
 
+import supybot.conf as conf
 import supybot.utils as utils
 import supybot.ircdb as ircdb
 from supybot.commands import *
@@ -129,7 +130,17 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
             irc.reply('%s: %s' % (choice_row[0], choice_row[1]), prefixNick=False)
             choice_row = cursor.fetchone()
 
-        irc.reply('To vote, do !vote %s <choice number>' % pollid, prefixNick=False) 
+        prefixChars = conf.supybot.reply.whenAddressedBy.chars()
+        prefixStrings = conf.supybot.reply.whenAddressedBy.strings()
+        prefixSubString = (' '.join(prefixStrings)).split(' ',1)[0]
+        if prefixChars:
+            vote_cmd = ''.join((prefixChars[:1],'vote'))
+        elif prefixSubString:
+            vote_cmd = ''.join((prefixSubString,'vote'))
+        else:
+            vote_cmd = ': '.join((irc.nick,'vote'))
+
+        irc.reply('To vote, do %s %s <choice number>' % (vote_cmd, pollid), prefixNick=False) 
 
     def newpoll(self, irc, msg, args, channel, interval, answers, question):
         """<number of minutes for announce interval> <"answer, answer, ..."> question

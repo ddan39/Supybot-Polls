@@ -175,8 +175,6 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         schedule.addPeriodicEvent(runPoll, interval*60, name='%s_poll_%s' % (channel, pollid))
         self.poll_schedules.append('%s_poll_%s' % (channel, pollid))
 
-        irc.replySuccess()
-
     newpoll = wrap(newpoll, ['channeldb', 'Op', 'positiveInt', commalist('something'), 'text'])
 
     def vote(self, irc, msg, args, channel, pollid, choice):
@@ -261,8 +259,6 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
             irc.reply('%s: %s - %s votes' % (choice_row[0], choice_row[1], vote_row[0]), prefixNick=False, private=True)
             choice_row = cursor1.fetchone()
 
-        irc.replySuccess()
-
     results = wrap(results, ['channeldb', 'positiveInt'])
 
     #TODO finish this command...
@@ -320,8 +316,6 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         schedule.addPeriodicEvent(runPoll, interval*60, name='%s_poll_%s' % (channel, pollid))
         self.poll_schedules.append('%s_poll_%s' % (channel, pollid))
 
-        irc.replySuccess()
-
     pollon = wrap(pollon, ['channeldb', 'Op', 'positiveInt', 'positiveInt'])
 
     def polloff(self, irc, msg, args, channel, pollid):
@@ -352,8 +346,6 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         except:
             irc.error('Removing scedule failed')
 
-        irc.replySuccess()
-
     polloff = wrap(polloff, ['channeldb', 'Op', 'positiveInt'])
 
     def closepoll(self, irc, msg, args, channel, pollid):
@@ -381,8 +373,6 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
             self.poll_schedules.remove('%s_poll_%s' % (channel, pollid))
         except:
             self.log.warning('Failed to remove schedule event')
-
-        irc.replySuccess()
 
     closepoll = wrap(closepoll, ['channeldb', 'Op', 'positiveInt'])
 

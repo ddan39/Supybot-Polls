@@ -143,8 +143,9 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         irc.reply('To vote, do %s %s <choice number>' % (vote_cmd, pollid), prefixNick=False) 
 
     def newpoll(self, irc, msg, args, channel, interval, answers, question):
-        """<number of minutes for announce interval> <"answer, answer, ..."> question
-        op command to add a new poll"""
+        """<number of minutes for announce interval> <"answer,answer,..."> question
+        Creates a new poll with the given question and answers. <channel> is
+        only necessary if the message isn't sent in the channel itself."""
 
         capability = ircdb.makeChannelCapability(channel, 'op')
         if not ircdb.checkCapability(msg.prefix, capability):
@@ -178,8 +179,11 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
     newpoll = wrap(newpoll, ['channeldb', 'Op', 'positiveInt', commalist('something'), 'text'])
 
     def vote(self, irc, msg, args, channel, pollid, choice):
-        """<poll id number> <choice letter>
-        public command to vote on poll"""
+        """[<channel>] <poll id number> <choice letter>
+        Vote for the option with the given <choice letter> on the poll with
+        the given poll <id>. This command can also be used to override any
+        previous vote. <channel> is only necesssary if the message isn't sent
+        in the channel itself."""
 
         choice = choice.upper()
         db = self.getDb(channel)
@@ -232,8 +236,10 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
     vote = wrap(vote, ['channeldb', 'positiveInt', 'letter'])
 
     def results(self, irc, msg, args, channel, pollid):
-        """[channel] <pollid>
-        public command to PM you results of poll. You have to had voted already"""
+        """[<channel>] <id>
+        Privately shows the results for the poll with the given <id>.
+        <channel> is only necessary if the message is not sent in the
+        channel itself. You have to had voted already"""
 
         db = self.getDb(channel)
         cursor = db.cursor()
@@ -267,8 +273,9 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
 
     #TODO finish this command...
     def openpolls(self, irc, msg, args, channel):
-        """takes no arguments
-        public command to PM you list of all polls"""
+        """[<channel>]
+        Privately lists the currently open polls for <channel>. <channel> is
+        only necessary if the message isn't sent in the channel itself."""
         db = self.getDb(channel)
         cursor = db.cursor()
 
@@ -289,8 +296,10 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
     openpolls = wrap(openpolls, ['channeldb'])
 
     def pollon(self, irc, msg, args, channel, pollid, interval):
-        """[channel] <pollid> <interval in minutes>
-        op command to turn a poll schedule on so it is announcing, with interval"""
+        """<[channel]> <id> <interval in minutes>
+        Schedules announcement of poll with the given <id> every <interval>.
+        <channel> is only necessary if the message is not sent in the channel
+        itself."""
 
         db = self.getDb(channel)
         cursor = db.cursor()
@@ -323,8 +332,9 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
     pollon = wrap(pollon, ['channeldb', 'Op', 'positiveInt', 'positiveInt'])
 
     def polloff(self, irc, msg, args, channel, pollid):
-        """[channel] <pollid>
-        op command to stop a poll schedule from announcing"""
+        """[<channel>] <id>
+        Stops the poll with the given <id> from announcing. <channel> is
+        only necessary if the message is not sent in the channel itself."""
 
         db = self.getDb(channel)
         cursor = db.cursor()
@@ -349,12 +359,15 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
             self.poll_schedules.remove('%s_poll_%s' % (channel, pollid))
         except:
             irc.error('Removing scedule failed')
+            
 
     polloff = wrap(polloff, ['channeldb', 'Op', 'positiveInt'])
 
     def closepoll(self, irc, msg, args, channel, pollid):
-        """[channel] <pollid>
-        op command to close poll. No more voting allowed."""
+        """[channel] <id>
+        Closes the poll with the given <id>. Further votes will not be
+        allowed. <channel> is only necessary if the message isn't sent in
+        the channel itself."""
 
         db = self.getDb(channel)
         cursor = db.cursor()
@@ -381,8 +394,10 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
     closepoll = wrap(closepoll, ['channeldb', 'Op', 'positiveInt'])
 
     def openpoll(self, irc, msg, args, channel, pollid, interval):
-        """[channel] <pollid>
-        op command to open poll for voting. Starts schedule to do announcing if set to active"""
+        """[<channel>] <id>
+        Starts announcing poll with the given <id> if set to active.
+        <channel> is only necessary if the message isn't sent in the channel
+        itself."""
 
         db = self.getDb(channel)
         cursor = db.cursor()

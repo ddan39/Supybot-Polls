@@ -362,7 +362,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
             return
 
         # close the poll in db
-        self._execute_query(cursor, 'UPDATE polls SET closed=? WHERE id=?', (datetime.datetime.now(), pollid))
+        self._execute_query(cursor, 'UPDATE polls SET closed=? WHERE id=?', datetime.datetime.now(), pollid)
         db.commit()
 
         try:

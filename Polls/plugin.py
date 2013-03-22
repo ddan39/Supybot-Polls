@@ -359,7 +359,9 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
             self.poll_schedules.remove('%s_poll_%s' % (channel, pollid))
         except:
             irc.error('Removing scedule failed')
-            
+            return
+
+        irc.replySuccess()
 
     polloff = wrap(polloff, ['channeldb', 'Op', 'positiveInt'])
 
@@ -390,6 +392,9 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
             self.poll_schedules.remove('%s_poll_%s' % (channel, pollid))
         except:
             self.log.warning('Failed to remove schedule event')
+            return
+
+        irc.replySuccess()
 
     closepoll = wrap(closepoll, ['channeldb', 'Op', 'positiveInt'])
 

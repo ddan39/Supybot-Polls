@@ -380,7 +380,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
             irc.error('Poll id doesnt exist')
             return
         if pollinfo[1] is not None:
-            irc.error('Poll already closed on %s' % result[1].strftime('%Y-%m-%d at %-I:%M %p'))
+            irc.error('Poll already closed on %s' % pollinfo[1].strftime('%Y-%m-%d at %-I:%M %p'))
             return
 
         # close the poll in db

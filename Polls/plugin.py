@@ -204,16 +204,19 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         # query to check they havnt already voted on this poll
         self._execute_query(cursor, 'SELECT choice,time FROM votes WHERE (voter_nick=? OR voter_host=?) AND poll_id=?', msg.nick, msg.host, pollid)
         result = cursor.fetchone()
-        if result is not None:
-            irc.error('You have already voted for %s on %s' % (result[0], result[1].strftime('%Y-%m-%d at %-I:%M %p')))
-            return
-
-        # query to insert their vote
-        self._execute_query(cursor, 'INSERT INTO votes VALUES (?,?,?,?,?,?)', None, pollid, msg.nick, msg.host, choice, datetime.datetime.now())
+        same_choice = bool(result[0] == choice)
+        if result is not None and not same_choice:
+            # query to update their vote
+            self._execute_query(cursor, 'UPDATE votes SET choice=?, time=? WHERE (voter_nick=? OR voter_host=?) AND poll_id=?', choice, datetime.datetime.now(), msg.nick, msg.host, pollid)
+        elif same_choice:
+           irc.error('You have already voted for %s on %s' % (result[0], result[1].strftime('%Y-%m-%d at %-I:%M %p')))
+           return
+        else:
+            # query to insert their vote
+            self._execute_query(cursor, 'INSERT INTO votes VALUES (?,?,?,?,?,?)', None, pollid, msg.nick, msg.host, choice, datetime.datetime.now())
         db.commit()
 
         irc.reply('Your vote on poll #%s for %s has been inputed, sending you results in PM' % (pollid, choice), prefixNick=False)
-
         irc.reply('Here is results for poll #%s, you just voted for %s' % (pollid, choice), prefixNick=False, private=True)
 
         # query loop thru each choice for this poll, and for each choice another query to grab number of votes, and output

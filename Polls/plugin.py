@@ -181,6 +181,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         """<poll id number> <choice letter>
         public command to vote on poll"""
 
+        choice = choice.upper()
         db = self.getDb(channel)
         cursor = db.cursor()
 

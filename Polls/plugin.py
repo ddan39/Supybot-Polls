@@ -120,14 +120,14 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
                 self.log.warning('_runPoll Failed to remove schedule event for %s %s' % (channel, pollid))
             return
 
-        irc.reply('Poll #%s: %s' % (pollid, question), prefixNick=False)
+        irc.reply('Poll #%s: %s' % (pollid, question), prefixNick=False, to=channel)
 
         self._execute_query(cursor, 'SELECT choice_char,choice FROM choices WHERE poll_id=? ORDER BY choice_char', pollid)
 
         # output all of the polls choices
         choice_row = cursor.fetchone()
         while choice_row is not None:
-            irc.reply('%s: %s' % (choice_row[0], choice_row[1]), prefixNick=False)
+            irc.reply('%s: %s' % (choice_row[0], choice_row[1]), prefixNick=False, to=channel)
             choice_row = cursor.fetchone()
 
         prefixChars = conf.supybot.reply.whenAddressedBy.chars()
@@ -140,7 +140,7 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         else:
             vote_cmd = ': '.join((irc.nick,'vote'))
 
-        irc.reply('To vote, do %s %s <choice number>' % (vote_cmd, pollid), prefixNick=False) 
+        irc.reply('To vote, do %s %s <choice number>' % (vote_cmd, pollid), prefixNick=False, to=channel) 
 
     def newpoll(self, irc, msg, args, channel, interval, answers, question):
         """<number of minutes for announce interval> <"answer,answer,..."> question

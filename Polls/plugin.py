@@ -5,6 +5,7 @@
 #
 ###
 
+import supybot.conf as conf
 import supybot.utils as utils
 import supybot.ircdb as ircdb
 from supybot.commands import *
@@ -119,21 +120,32 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
                 self.log.warning('_runPoll Failed to remove schedule event for %s %s' % (channel, pollid))
             return
 
-        irc.reply('Poll #%s: %s' % (pollid, question), prefixNick=False)
+        irc.reply('Poll #%s: %s' % (pollid, question), prefixNick=False, to=channel)
 
         self._execute_query(cursor, 'SELECT choice_char,choice FROM choices WHERE poll_id=? ORDER BY choice_char', pollid)
 
         # output all of the polls choices
         choice_row = cursor.fetchone()
         while choice_row is not None:
-            irc.reply('%s: %s' % (choice_row[0], choice_row[1]), prefixNick=False)
+            irc.reply('%s: %s' % (choice_row[0], choice_row[1]), prefixNick=False, to=channel)
             choice_row = cursor.fetchone()
 
-        irc.reply('To vote, do !vote %s <choice number>' % pollid, prefixNick=False) 
+        prefixChars = conf.supybot.reply.whenAddressedBy.chars()
+        prefixStrings = conf.supybot.reply.whenAddressedBy.strings()
+        prefixSubString = (' '.join(prefixStrings)).split(' ',1)[0]
+        if prefixChars:
+            vote_cmd = ''.join((prefixChars[:1],'vote'))
+        elif prefixSubString:
+            vote_cmd = ''.join((prefixSubString,'vote'))
+        else:
+            vote_cmd = ': '.join((irc.nick,'vote'))
+
+        irc.reply('To vote, do %s %s <choice number>' % (vote_cmd, pollid), prefixNick=False, to=channel) 
 
     def newpoll(self, irc, msg, args, channel, interval, answers, question):
-        """<number of minutes for announce interval> <"answer, answer, ..."> question
-        op command to add a new poll"""
+        """<number of minutes for announce interval> <"answer,answer,..."> question
+        Creates a new poll with the given question and answers. <channel> is
+        only necessary if the message isn't sent in the channel itself."""
 
         capability = ircdb.makeChannelCapability(channel, 'op')
         if not ircdb.checkCapability(msg.prefix, capability):
@@ -164,14 +176,16 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         schedule.addPeriodicEvent(runPoll, interval*60, name='%s_poll_%s' % (channel, pollid))
         self.poll_schedules.append('%s_poll_%s' % (channel, pollid))
 
-        irc.replySuccess()
-
     newpoll = wrap(newpoll, ['channeldb', 'Op', 'positiveInt', commalist('something'), 'text'])
 
     def vote(self, irc, msg, args, channel, pollid, choice):
-        """<poll id number> <choice letter>
-        public command to vote on poll"""
+        """[<channel>] <poll id number> <choice letter>
+        Vote for the option with the given <choice letter> on the poll with
+        the given poll <id>. This command can also be used to override any
+        previous vote. <channel> is only necesssary if the message isn't sent
+        in the channel itself."""
 
+        choice = choice.upper()
         db = self.getDb(channel)
         cursor = db.cursor()
 
@@ -194,16 +208,19 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         # query to check they havnt already voted on this poll
         self._execute_query(cursor, 'SELECT choice,time FROM votes WHERE (voter_nick=? OR voter_host=?) AND poll_id=?', msg.nick, msg.host, pollid)
         result = cursor.fetchone()
-        if result is not None:
-            irc.error('You have already voted for %s on %s' % (result[0], result[1].strftime('%Y-%m-%d at %-I:%M %p')))
-            return
-
-        # query to insert their vote
-        self._execute_query(cursor, 'INSERT INTO votes VALUES (?,?,?,?,?,?)', None, pollid, msg.nick, msg.host, choice, datetime.datetime.now())
+        same_choice = bool(result[0] == choice)
+        if result is not None and not same_choice:
+            # query to update their vote
+            self._execute_query(cursor, 'UPDATE votes SET choice=?, time=? WHERE (voter_nick=? OR voter_host=?) AND poll_id=?', choice, datetime.datetime.now(), msg.nick, msg.host, pollid)
+        elif same_choice:
+           irc.error('You have already voted for %s on %s' % (result[0], result[1].strftime('%Y-%m-%d at %-I:%M %p')))
+           return
+        else:
+            # query to insert their vote
+            self._execute_query(cursor, 'INSERT INTO votes VALUES (?,?,?,?,?,?)', None, pollid, msg.nick, msg.host, choice, datetime.datetime.now())
         db.commit()
 
         irc.reply('Your vote on poll #%s for %s has been inputed, sending you results in PM' % (pollid, choice), prefixNick=False)
-
         irc.reply('Here is results for poll #%s, you just voted for %s' % (pollid, choice), prefixNick=False, private=True)
 
         # query loop thru each choice for this poll, and for each choice another query to grab number of votes, and output
@@ -219,8 +236,10 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
     vote = wrap(vote, ['channeldb', 'positiveInt', 'letter'])
 
     def results(self, irc, msg, args, channel, pollid):
-        """[channel] <pollid>
-        public command to PM you results of poll. You have to had voted already"""
+        """[<channel>] <id>
+        Privately shows the results for the poll with the given <id>.
+        <channel> is only necessary if the message is not sent in the
+        channel itself. You have to had voted already"""
 
         db = self.getDb(channel)
         cursor = db.cursor()
@@ -250,14 +269,13 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
             irc.reply('%s: %s - %s votes' % (choice_row[0], choice_row[1], vote_row[0]), prefixNick=False, private=True)
             choice_row = cursor1.fetchone()
 
-        irc.replySuccess()
-
     results = wrap(results, ['channeldb', 'positiveInt'])
 
     #TODO finish this command...
     def openpolls(self, irc, msg, args, channel):
-        """takes no arguments
-        public command to PM you list of all polls"""
+        """[<channel>]
+        Privately lists the currently open polls for <channel>. <channel> is
+        only necessary if the message isn't sent in the channel itself."""
         db = self.getDb(channel)
         cursor = db.cursor()
 
@@ -278,8 +296,10 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
     openpolls = wrap(openpolls, ['channeldb'])
 
     def pollon(self, irc, msg, args, channel, pollid, interval):
-        """[channel] <pollid> <interval in minutes>
-        op command to turn a poll schedule on so it is announcing, with interval"""
+        """<[channel]> <id> <interval in minutes>
+        Schedules announcement of poll with the given <id> every <interval>.
+        <channel> is only necessary if the message is not sent in the channel
+        itself."""
 
         db = self.getDb(channel)
         cursor = db.cursor()
@@ -309,13 +329,12 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         schedule.addPeriodicEvent(runPoll, interval*60, name='%s_poll_%s' % (channel, pollid))
         self.poll_schedules.append('%s_poll_%s' % (channel, pollid))
 
-        irc.replySuccess()
-
     pollon = wrap(pollon, ['channeldb', 'Op', 'positiveInt', 'positiveInt'])
 
     def polloff(self, irc, msg, args, channel, pollid):
-        """[channel] <pollid>
-        op command to stop a poll schedule from announcing"""
+        """[<channel>] <id>
+        Stops the poll with the given <id> from announcing. <channel> is
+        only necessary if the message is not sent in the channel itself."""
 
         db = self.getDb(channel)
         cursor = db.cursor()
@@ -340,14 +359,17 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
             self.poll_schedules.remove('%s_poll_%s' % (channel, pollid))
         except:
             irc.error('Removing scedule failed')
+            return
 
         irc.replySuccess()
 
     polloff = wrap(polloff, ['channeldb', 'Op', 'positiveInt'])
 
     def closepoll(self, irc, msg, args, channel, pollid):
-        """[channel] <pollid>
-        op command to close poll. No more voting allowed."""
+        """[channel] <id>
+        Closes the poll with the given <id>. Further votes will not be
+        allowed. <channel> is only necessary if the message isn't sent in
+        the channel itself."""
 
         db = self.getDb(channel)
         cursor = db.cursor()
@@ -358,11 +380,11 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
             irc.error('Poll id doesnt exist')
             return
         if pollinfo[1] is not None:
-            irc.error('Poll already closed on %s' % result[1].strftime('%Y-%m-%d at %-I:%M %p'))
+            irc.error('Poll already closed on %s' % pollinfo[1].strftime('%Y-%m-%d at %-I:%M %p'))
             return
 
         # close the poll in db
-        self._execute_query(cursor, 'UPDATE polls SET closed=? WHERE id=?', (datetime.datetime.now(), pollid))
+        self._execute_query(cursor, 'UPDATE polls SET closed=? WHERE id=?', datetime.datetime.now(), pollid)
         db.commit()
 
         try:
@@ -370,14 +392,17 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
             self.poll_schedules.remove('%s_poll_%s' % (channel, pollid))
         except:
             self.log.warning('Failed to remove schedule event')
+            return
 
         irc.replySuccess()
 
     closepoll = wrap(closepoll, ['channeldb', 'Op', 'positiveInt'])
 
     def openpoll(self, irc, msg, args, channel, pollid, interval):
-        """[channel] <pollid>
-        op command to open poll for voting. Starts schedule to do announcing if set to active"""
+        """[<channel>] <id>
+        Starts announcing poll with the given <id> if set to active.
+        <channel> is only necessary if the message isn't sent in the channel
+        itself."""
 
         db = self.getDb(channel)
         cursor = db.cursor()

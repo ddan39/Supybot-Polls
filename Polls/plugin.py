@@ -208,13 +208,13 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         # query to check they havnt already voted on this poll
         self._execute_query(cursor, 'SELECT choice,time FROM votes WHERE (voter_nick=? OR voter_host=?) AND poll_id=?', msg.nick, msg.host, pollid)
         result = cursor.fetchone()
-        same_choice = bool(result[0] == choice)
-        if result is not None and not same_choice:
-            # query to update their vote
-            self._execute_query(cursor, 'UPDATE votes SET choice=?, time=? WHERE (voter_nick=? OR voter_host=?) AND poll_id=?', choice, datetime.datetime.now(), msg.nick, msg.host, pollid)
-        elif same_choice:
-           irc.error('You have already voted for %s on %s' % (result[0], result[1].strftime('%Y-%m-%d at %-I:%M %p')))
-           return
+        if result is not None:
+            if result[0] == choice:
+               irc.error('You have already voted for %s on %s' % (result[0], result[1].strftime('%Y-%m-%d at %-I:%M %p')))
+               return
+           else:
+                # query to update their vote
+                self._execute_query(cursor, 'UPDATE votes SET choice=?, time=? WHERE (voter_nick=? OR voter_host=?) AND poll_id=?', choice, datetime.datetime.now(), msg.nick, msg.host, pollid)
         else:
             # query to insert their vote
             self._execute_query(cursor, 'INSERT INTO votes VALUES (?,?,?,?,?,?)', None, pollid, msg.nick, msg.host, choice, datetime.datetime.now())

@@ -210,9 +210,9 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
         result = cursor.fetchone()
         if result is not None:
             if result[0] == choice:
-               irc.error('You have already voted for %s on %s' % (result[0], result[1].strftime('%Y-%m-%d at %-I:%M %p')))
-               return
-           else:
+                irc.error('You have already voted for %s on %s' % (result[0], result[1].strftime('%Y-%m-%d at %-I:%M %p')))
+                return
+            else:
                 # query to update their vote
                 self._execute_query(cursor, 'UPDATE votes SET choice=?, time=? WHERE (voter_nick=? OR voter_host=?) AND poll_id=?', choice, datetime.datetime.now(), msg.nick, msg.host, pollid)
         else:

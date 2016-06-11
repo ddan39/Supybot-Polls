@@ -392,7 +392,6 @@ class Polls(callbacks.Plugin, plugins.ChannelDBHandler):
             self.poll_schedules.remove('%s_poll_%s' % (channel, pollid))
         except:
             self.log.warning('Failed to remove schedule event')
-            return
 
         irc.replySuccess()
 
